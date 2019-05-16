@@ -20,8 +20,7 @@ def grid_coord(guide, xx, yy, sz, grid_sz, sigma_r):
 def BilateralSlice(sz, i_chans, o_chans, grid_sz=64, sigma_r=8):
   gsize = [(i_chans+1)*o_chans, sigma_r, grid_sz, grid_sz]
   grid = C.Parameter(gsize, 
-                     name="grid", init=np.random.uniform(0, 0.1, size=gsize))
-                     # name="grid", init=np.random.uniform(size=gsize))
+                     name="grid", init=np.random.uniform(size=gsize))
   guide_scale = C.Parameter((1, ), 
                      name="guide_scale", init=np.ones((1, )))
   grid_scale = C.Parameter((1, ), 
@@ -113,29 +112,27 @@ def main():
   model = BilateralSlice(sz, n_chans, n_chans, sigma_r=sigma_r, grid_sz=grid_sz)
   out = model(im, guide, guide_no_grad)
 
+  loss = C.squared_error(out, im)
+
+  # --- Train -----------------------------------------------------------------
+  C.debugging.profiler.start_profiler("/output/pyprof")
+  C.debugging.profiler.enable_profiler()
+  learner = C.sgd(model.parameters, C.learning_parameter_schedule(lr))
+  progress_writer = C.logging.ProgressPrinter(0)
+  summary = loss.train((imdata, data, data), parameter_learners=[learner],
+                       callbacks=[progress_writer], max_epochs=n_epochs,
+                       minibatch_size=bs)
+  C.debugging.profiler.stop_profiler()
+  # ---------------------------------------------------------------------------
+
   svg = C.logging.graph.plot(out, "/output/graph.svg")
 
+  # --- Show output -----------------------------------------------------------
   if show_image:
-    # --- Show output -----------------------------------------------------------
-    inputs = {im:imdata[0], guide:data[0], guide_no_grad:data[0]}
+    inputs = {guide:data[0], guide_no_grad:data[0]}
     out_ = out.eval(inputs)
     out_ = np.clip(np.transpose(np.squeeze(out_), [1, 2, 0]), 0, 1)
     skio.imsave("/output/imout.png", out_)
-  else:
-    # --- Train -----------------------------------------------------------------
-    loss = C.squared_error(out, im)
-    C.debugging.profiler.start_profiler("/output/pyprof")
-    C.debugging.profiler.enable_profiler()
-    learner = C.sgd(model.parameters, C.learning_parameter_schedule(lr))
-    progress_writer = C.logging.ProgressPrinter(0)
-    begin = time.time()
-    summary = loss.train((imdata, data, data), parameter_learners=[learner],
-                         callbacks=[progress_writer], max_epochs=n_epochs,
-                         minibatch_size=bs)
-    end = time.time()
-    runtime = (end-begin)*1000.0/n_epochs
-    print('Runtime:',runtime)
-    C.debugging.profiler.stop_profiler()
   # ---------------------------------------------------------------------------
 
 

@@ -88,8 +88,7 @@ public:
               {{0, 127}, {0, 127}, {0, 63}}, //d_guide
               {{0, 3}, {0, 3}, {0, 3}, {0, 63}, {0, 63}} //d_filter
             },
-            options,
-            dont_inline);
+            options);
 
         // printf("Manually scheduling bilateral_layer backward\n");
         // // for(auto it=adjoints.begin(); it != adjoints.end(); ++it) {

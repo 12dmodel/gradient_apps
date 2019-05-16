@@ -53,8 +53,7 @@ public:
             {0, 127},
             {0, 63},
             {0, 3}},
-          options,
-          dont_inline);
+          options);
 
         // if (get_target().has_gpu_feature()) {
         //   Var xi, yi;

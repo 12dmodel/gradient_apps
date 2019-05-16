@@ -42,23 +42,22 @@ public:
                 {"mosaick.min.0", 0},
                 {"mosaick.min.1", 0},
                 {"mosaick.min.2", 0},
-                {"mosaick.extent.0", 64},
-                {"mosaick.extent.1", 64},
-                {"mosaick.extent.2", 16},
+                {"mosaick.extent.0", 256},
+                {"mosaick.extent.1", 256},
+                {"mosaick.extent.2", 4},
                 {"d_output.min.0", 0},
                 {"d_output.min.1", 0},
                 {"d_output.min.2", 0},
                 {"d_output.min.3", 0},
-                {"d_output.extent.0", 64},
-                {"d_output.extent.1", 64},
+                {"d_output.extent.0", 256},
+                {"d_output.extent.1", 256},
                 {"d_output.extent.2", 3},
-                {"d_output.extent.3", 16},
+                {"d_output.extent.3", 4},
               },
-              {{0, 63},
-                {0, 63},
-                {0, 15}},
-              options,
-              dont_inline);
+              {{0, 255},
+                {0, 255},
+                {0, 3}},
+              options);
 
           // Var xi("xi"), yi("yi"), xy("xy"), xyn("xyn");
           //

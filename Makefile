@@ -1,9 +1,5 @@
-.PHONY: gapps clean gradient-halide
-
-gapps: gradient-halide
-	@$(MAKE) -C $@
-
-gradient-halide:
+.PHONY: gapps clean
+gapps:
 	@$(MAKE) -C $@
 
 clean:

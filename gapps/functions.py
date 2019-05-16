@@ -11,8 +11,7 @@ from ._ext import operators as ops
 
 def has_cuda_inputs(args):
   for a in args:
-    md = inspect.getmodule(a.__class__).__name__
-    if "cuda" in md:
+    if isinstance(a, torch.Tensor) and a.is_cuda:
       return True
   return False
 
@@ -550,40 +549,43 @@ class BilateralGrid(Function):
   """"""
 
   @staticmethod
-  def forward(ctx, input, filter_s, filter_r):
+  def forward(ctx, input, guide, filter_s, filter_r):
     if any(ctx.needs_input_grad):
-      ctx.save_for_backward(input, filter_s, filter_r)
+      ctx.save_for_backward(input, guide, filter_s, filter_r)
 
-    c, h, w = input.shape
+    n, c, h, w = input.shape
 
     output = input.new()
-    output.resize_(c, h, w);
+    output.resize_(n, c, h, w);
 
     ops.bilateral_grid_forward(
-        input, filter_s, filter_r, output)
+        input, guide, filter_s, filter_r, output)
 
     return output
 
   @staticmethod
   def backward(ctx, d_output):
-    input, filter_s, filter_r = ctx.saved_variables
+    input, guide, filter_s, filter_r = ctx.saved_variables
 
     d_input = input.data.new()
     d_input.resize_as_(input.data)
+    d_guide = guide.data.new()
+    d_guide.resize_as_(guide.data)
     d_filter_s = filter_s.data.new()
     d_filter_s.resize_as_(filter_s.data)
     d_filter_r = filter_r.data.new()
     d_filter_r.resize_as_(filter_r.data)
 
     ops.bilateral_grid_backward(
-        input.data, filter_s.data, filter_r.data, d_output.data,
-        d_input, d_filter_s, d_filter_r)
+        input.data, guide.data, filter_s.data, filter_r.data, d_output.data,
+        d_input, d_guide, d_filter_s, d_filter_r)
 
     d_input = Variable(d_input)
+    d_guide = Variable(d_guide)
     d_filter_s = Variable(d_filter_s)
     d_filter_r = Variable(d_filter_r)
 
-    return d_input, d_filter_s, d_filter_r
+    return d_input, d_guide, d_filter_s, d_filter_r
 
 class DeconvPrior(Function):
   """"""
@@ -870,6 +872,52 @@ class BilinearResampling(Function):
     return d_input, d_warp
 
 
+class BicubicResizing(Function):
+  """"""
+
+  @staticmethod
+  def forward(ctx, input, new_W, new_H, B=1.0, C=0.0):
+    """
+    Args:
+        input: input image to be resized
+        new_W: new width
+        new_H: new height
+        B, C: parameters of the spline (refer to Mitchell's SIGGRAPH'88 paper).
+            Default is (1, 0) which makes this a B-spline.
+    """
+    ctx.save_for_backward(input, new_W, new_H, B, C)
+
+    print(new_W, new_H, B, C)
+    bs, ci, h, w = input.shape
+    output = torch.empty((bs, ci, new_H, new_W),
+                         dtype=torch.float32)
+    if input.is_cuda:
+        output = output.cuda()
+
+    print(input.dtype)
+    print(output.dtype)
+
+    ops.bicubic_resizing_forward(
+        input, new_W, new_H, B, C, output)
+
+    return output
+
+  @staticmethod
+  def backward(ctx, d_output):
+    input, new_W, new_H, B, C = ctx.saved_variables
+
+    d_input = input.data.new()
+    d_input.resize_as_(input.data)
+
+    ops.bicubic_resizing_backward(
+        input.data, new_W, new_H, B, C,
+        d_output.data, d_input)
+
+    d_input = Variable(d_input)
+
+    return d_input
+
+
 class BurstDemosaicking(Function):
   """"""
 
@@ -1056,3 +1104,35 @@ class BilateralSliceApply(Function):
     d_input = Variable(d_input)
 
     return d_grid, d_guide, d_input
+
+
+class BilateralSlice(Function):
+  """"""
+
+  @staticmethod
+  def forward(ctx, grid, guide):
+    ctx.save_for_backward(grid, guide)
+    bs, h, w = guide.shape
+    ci = grid.shape[1]
+    output = torch.empty_like(guide)
+    output.resize_(bs, ci, h, w)
+    ops.bilateral_slice_forward(grid, guide, output)
+    return output
+
+  @staticmethod
+  def backward(ctx, d_output):
+    grid, guide, input = ctx.saved_variables
+    d_grid = grid.data.new()
+    d_guide = guide.data.new()
+
+    d_grid.resize_as_(grid.data)
+    d_guide.resize_as_(guide.data)
+
+    ops.bilateral_slice_apply_backward(
+        grid.data, guide.data, d_output.data,
+        d_grid, d_guide)
+
+    d_grid = Variable(d_grid)
+    d_guide = Variable(d_guide)
+
+    return d_grid, d_guide
